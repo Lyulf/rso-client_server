@@ -1,5 +1,7 @@
 #include "../include/client.h"
 #include "../include/defaults.h"
+#include "../include/disconnected.h"
+#include "../include/message_types.h"
 #include <iostream>
 #include <limits.h>
 #include <string.h>
@@ -9,8 +11,7 @@ using namespace rso;
 int main() {
   try {
     Client client(defaults::address);
-    std::shared_ptr<Message> msg;
-    decltype(Message::type) request_type = {0, 0, 0, 0};
+    int type;
     std::cout << "Types: " << std::endl;
     std::cout << "1: Sqrt Request" << std::endl;
     std::cout << "2: Date Request\n" << std::endl;
@@ -20,35 +21,34 @@ int main() {
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
       }
       std::cout << "Enter connection type: ";
-      std::cin >> request_type[3];
-      request_type[3] -= '0';
-      float value = 0.0;
+      std::cin >> type;
+      double value;
       bool invalid_request = false;
-      switch(request_type[3]) {
+      switch(type) {
       case 1:
         std::cout << "Enter value: ";
         std::cin >> value;
+        client.sendSqrtRequest(value);
+        break;
       case 2:
-        client.sendRequest(request_type, value);
+        client.sendDateRequest();
         break;
       default:
         invalid_request = true;
         break;
       }
       if(invalid_request) {
-        std::cout << "Invalid request type: " << request_type[0] << request_type[1] << request_type[2] << request_type[3] << std::endl;
+        std::cout << "Invalid request type: " << type << std::endl;
         continue;
       }
-      msg = client.receiveRequest();
-      std::cout << "\ntype: " << msg->type[0] << msg->type[1] << msg->type[2] << msg->type[3] << std::endl;
-      std::cout <<  "id: " << msg->id << std::endl;
-      switch(msg->type[3]) {
-      case 1:
-        std::cout << "result: " << std::static_pointer_cast<SqrtMsg>(msg)->value << std::endl;
-        break;
-      case 2:
-        std::cout << "length: " << std::static_pointer_cast<DateMsg>(msg)->length << std::endl;
-        std::cout << "date: " << std::static_pointer_cast<DateMsg>(msg)->date << std::endl;
+      Message msg = client.receiveRequest();
+      std::cout << "\ntype: " << msg.type << std::endl;
+      std::cout <<  "id: " << msg.id << std::endl;
+      if(msg.type == msg_type::sqrt_response) {
+        std::cout << "result: " << msg.value << std::endl;
+      } else if(msg.type == msg_type::date_response) {
+        std::cout << "length: " << msg.date.size() << std::endl;
+        std::cout << "date: " << msg.date << std::endl;
       }
     }
   } catch(std::runtime_error& e) {
