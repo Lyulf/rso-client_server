@@ -16,10 +16,10 @@ public:
       initAddress(ipv4);
       client_socket = socket(defaults::domain, SOCK_STREAM, 0);
       if(client_socket == -1) {
-        throw std::runtime_error("Failed to create a socket.\nErrno: " + std::string(strerror(errno)));
+        throwErrno<std::runtime_error>("Failed to create a socket.");
       }
       if(connect(client_socket, (sockaddr*) &address, address_length) == -1) {
-        throw std::runtime_error("Failed to connect to server.\nErrno: " + std::string(strerror(errno)));
+        throwErrno<std::runtime_error>("Failed to connect to server.");
       }
       std::cout << "Successfully conected" << std::endl;
   }

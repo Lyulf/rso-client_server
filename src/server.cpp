@@ -23,6 +23,7 @@ struct Server::ServerImpl {
   ServerImpl(const short port, const size_t max_clients, const int max_queue)
     : domain(defaults::domain), port(port), max_clients(max_clients),
       no_clients(0), max_queue(max_queue), mutex(), cond_var() {
+
     initAddress();
     initSocket();
     setOpt();
@@ -45,26 +46,26 @@ struct Server::ServerImpl {
   void initSocket() {
     master_socket = socket(domain, SOCK_STREAM, 0);
     if(master_socket == -1) {
-      throw std::runtime_error("Failed to create socket.\nErrno: " + std::string(strerror(errno)));
+      throwErrno<std::runtime_error>("Failed to create socket.");
     }
   }
 
   void setOpt() {
     int optval = 1;
     if(setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1) {
-      throw std::runtime_error("Cannot set SO_REUSEADDR.\nErrno: " + std::string(strerror(errno)));
+      throwErrno<std::runtime_error>("Cannot set SO_REUSEADDR.");
     }
   }
 
   void bindAddress() {
     if(bind(master_socket, (sockaddr*) &address, address_length) == -1) {
-      throw std::runtime_error("Failed to bind the address.\nErrno: " + std::string(strerror(errno)));
+      throwErrno<std::runtime_error>("Failed to bind the address.");
     }
   }
 
   void listenOnMaster() {
     if(listen(master_socket, max_queue) == -1) {
-      throw std::runtime_error("Failed to prepare to accept connections.\nErrno: " + std::string(strerror(errno)));
+      throwErrno<std::runtime_error>("Failed to prepare to accept connections.");
     }
   }
 
@@ -83,7 +84,7 @@ struct Server::ServerImpl {
       try {
         client_socket = accept(master_socket, (sockaddr*) client_address.get(), client_length.get());
         if(client_socket == -1) {
-          throw std::runtime_error("Failed to accept client.\nErrno: " + std::string(strerror(errno)));
+          throwErrno<std::runtime_error>("Failed to accept client.");
         }
         {
           std::lock_guard<std::mutex> lock(mutex);
