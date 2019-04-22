@@ -12,8 +12,9 @@ public:
     Client(const std::string& address, const short port = defaults::port);
     ~Client();
 
-    void sendRequest(const decltype(Message::type) type, const double value = 0.0);
-    std::shared_ptr<Message> receiveRequest();
+    void sendSqrtRequest(double value);
+    void sendDateRequest();
+    Message receiveRequest();
 
 private:
     struct ClientImpl;

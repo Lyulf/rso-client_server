@@ -1,6 +1,7 @@
 #include "../include/common.h"
 #include "../include/client.h"
 #include "../include/defaults.h"
+#include "../include/message_types.h"
 #include <arpa/inet.h>
 #include <iostream>
 #include <netinet/in.h>
@@ -27,67 +28,33 @@ public:
 
   }
 
-  void initAddress(const std::string ipv4) {
+  void initAddress(std::string ipv4) {
       address.sin_family = defaults::domain;
       address.sin_addr.s_addr = inet_addr(ipv4.c_str());
       address.sin_port = htons(port);
       address_length = sizeof(address);
   }
 
-  void sendRequest(const decltype(Message::type) type, const double value) {
-    switch(type[3]) {
-    case 1:
-      sendSqrtRequest(value);
-      break;
-    case 2:
-      sendDateRequest();
-      break;
-    }
-  }
-
-  void sendSqrtRequest(const double value) {
-    SqrtMsg msg;
-    msg.setType(0, 0, 0, 1);
+  void sendSqrtRequest(double value) {
+    Message msg;
+    msg.type = msg_type::sqrt_request;
     msg.id = noRequests++;
     msg.value = value;
-    msg_hton(&msg);
-    send_all(client_socket, &msg, sizeof(msg));
+    sendMsg(client_socket, msg);
     std::cout << "Sqrt request sent" << std::endl;
   }
 
   void sendDateRequest() {
     Message msg;
-    msg.setType(0, 0, 0, 2);
+    msg.type = msg_type::date_request;
     msg.id = noRequests++;
-    msg_hton(&msg);
-    send_all(client_socket, &msg, sizeof(msg));
+    sendMsg(client_socket, msg);
     std::cout << "Date request sent" << std::endl;
   }
 
-  std::shared_ptr<Message> receiveRequest() {
-    decltype(Message::type) type;
-    receive_all(client_socket, type, offsetof(Message, id));
-    if(type[3] == 1) {
-      SqrtMsg msg;
-      msg.setType(type);
-      receive_all(client_socket, &msg.id, sizeof(SqrtMsg) - offsetof(SqrtMsg, id));
-      std::cout << "Sqrt request received" << std::endl;
-      msg_ntoh(&msg);
-      return std::make_shared<SqrtMsg>(msg);
-    } else if(type[3] == 2) {
-      DateMsg msg;
-      msg.setType(type);
-      receive_all(client_socket, &msg.id, offsetof(DateMsg, date) - offsetof(DateMsg, id));
-      msg.date.resize(ntohl(msg.length)); // setting size manualy otherwise it will be 0
-      receive_all(client_socket, &msg.date.front(), ntohl(msg.length)); // probably undefined behavior
-      std::cout << "Date request received" << std::endl;
-      msg_ntoh(&msg);
-      return std::make_shared<DateMsg>(msg);
-      return nullptr;
-    } else {
-      std::cout << "Unknown request of type " << type[0] << type[1] << type[2] << type[3] <<  " received" << std::endl;
-      return nullptr;
-    }
+  Message receiveRequest() {
+    Message msg = receiveMsg(client_socket);
+    return msg;
   }
   
   int client_socket;
@@ -105,10 +72,14 @@ Client::~Client() {
 
 }
 
-void Client::sendRequest(const decltype(Message::type) type, const double value) {
-  impl->sendRequest(type, value);
+void Client::sendSqrtRequest(double value) {
+  impl->sendSqrtRequest(value);
 }
 
-std::shared_ptr<Message> Client::receiveRequest() {
+void Client::sendDateRequest() {
+  impl->sendDateRequest();
+}
+
+Message Client::receiveRequest() {
   return impl->receiveRequest();
 }

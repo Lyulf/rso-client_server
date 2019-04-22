@@ -9,7 +9,7 @@ namespace rso {
 struct Message;
 
 template <typename T>
-T swap_endian(const T value) {
+T swap_endian(const T& value) {
   // check if big endian
   if(htons(10) == 10) {
     return value;
@@ -24,10 +24,10 @@ T swap_endian(const T value) {
   return result;
 }
 
-void send_all(int sock_fd, void* buffer, size_t length);
-void receive_all(int sock_fd, void* buffer, size_t length);
-void msg_hton(Message* msg);
-void msg_ntoh(Message* msg);
+void send_all(int sock_fd, const void* buffer, std::size_t length);
+void receive_all(int sock_fd, void* buffer, std::size_t length);
+void sendMsg(int sock_fd, const Message& msg);
+Message receiveMsg(int sock_fd);
 
 }
 #endif
