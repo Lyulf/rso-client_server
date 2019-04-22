@@ -1,5 +1,6 @@
 #include "../include/client.h"
 #include "../include/defaults.h"
+#include "../include/disconnected.h"
 #include "../include/message_types.h"
 #include <iostream>
 #include <limits.h>

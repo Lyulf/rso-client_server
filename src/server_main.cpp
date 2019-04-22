@@ -4,7 +4,7 @@
 using namespace rso;
 
 int main() {
-  Server server(defaults::port, 1);
+  Server server;
   server.acceptClients();
   return 0;
 }

@@ -78,10 +78,7 @@ struct Server::ServerImpl {
       client_length = std::make_unique<socklen_t>(sizeof(sockaddr_in));
       {
         std::unique_lock<std::mutex> lock(mutex);
-        cond_var.wait(lock, [this] {
-          std::cout << "left=" << no_clients + 1 << " right=" << max_clients << std::endl;
-          return no_clients < max_clients;}
-          );
+        cond_var.wait(lock, [this] {return no_clients < max_clients;});
       }
       try {
         client_socket = accept(master_socket, (sockaddr*) client_address.get(), client_length.get());
