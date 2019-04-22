@@ -1,11 +1,12 @@
 #include "../include/common.h"
 #include "../include/defaults.h"
+#include "../include/disconnected.h"
 #include "../include/message.h"
 #include "../include/message_types.h"
 #include "../include/server.h"
 #include <arpa/inet.h>
-#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <ctime>
 #include <iostream>
 #include <math.h>
@@ -16,19 +17,17 @@
 #include <thread>
 #include <unistd.h>
 
-#define UNUSED(expr) (void)(expr)
-
 using namespace rso;
 
 struct Server::ServerImpl {
   ServerImpl(const short port, const size_t max_clients, const int max_queue)
     : domain(defaults::domain), port(port), max_clients(max_clients),
-      no_clients(0), max_queue(max_queue), mutex() {
-    if(max_clients < static_cast<unsigned int>(max_queue)) {
-      throw std::invalid_argument("max_clients can't be smaller than max_queue");
-    }
+      no_clients(0), max_queue(max_queue), mutex(), cond_var() {
     initAddress();
-    initServer();
+    initSocket();
+    setOpt();
+    bindAddress();
+    listenOnMaster();
     std::cout << "Server initialized" << std::endl;
   }
   
@@ -43,18 +42,27 @@ struct Server::ServerImpl {
     address_length = sizeof(address);
   }
 
-  void initServer() {
+  void initSocket() {
     master_socket = socket(domain, SOCK_STREAM, 0);
     if(master_socket == -1) {
       throw std::runtime_error("Failed to create socket.\nErrno: " + std::string(strerror(errno)));
     }
+  }
+
+  void setOpt() {
     int optval = 1;
     if(setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1) {
       throw std::runtime_error("Cannot set SO_REUSEADDR.\nErrno: " + std::string(strerror(errno)));
     }
+  }
+
+  void bindAddress() {
     if(bind(master_socket, (sockaddr*) &address, address_length) == -1) {
       throw std::runtime_error("Failed to bind the address.\nErrno: " + std::string(strerror(errno)));
     }
+  }
+
+  void listenOnMaster() {
     if(listen(master_socket, max_queue) == -1) {
       throw std::runtime_error("Failed to prepare to accept connections.\nErrno: " + std::string(strerror(errno)));
     }
@@ -68,20 +76,26 @@ struct Server::ServerImpl {
     while(true) {
       client_address = std::make_unique<sockaddr_in>();
       client_length = std::make_unique<socklen_t>(sizeof(sockaddr_in));
-      if(no_clients + 1 < max_clients) {
-        try {
-          client_socket = accept(master_socket, (sockaddr*) client_address.get(), client_length.get());
-          if(client_socket == -1) {
-            throw std::runtime_error("Failed to accept client.\nErrno: " + std::string(strerror(errno)));
-          }
-          std::cout << "Client " << client_socket << " connected" << std::endl;
-          no_clients++;
-          std::thread(&ServerImpl::handleClient, this, client_socket, std::move(client_address), std::move(client_length)).detach();
-        } catch(std::runtime_error& e) {
-          std::cout << e.what() << std::endl;
+      {
+        std::unique_lock<std::mutex> lock(mutex);
+        cond_var.wait(lock, [this] {
+          std::cout << "left=" << no_clients + 1 << " right=" << max_clients << std::endl;
+          return no_clients < max_clients;}
+          );
+      }
+      try {
+        client_socket = accept(master_socket, (sockaddr*) client_address.get(), client_length.get());
+        if(client_socket == -1) {
+          throw std::runtime_error("Failed to accept client.\nErrno: " + std::string(strerror(errno)));
         }
-      } else {
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        {
+          std::lock_guard<std::mutex> lock(mutex);
+          no_clients++;
+        }
+        std::cout << "Client " << client_socket << " connected" << std::endl;
+        std::thread(&ServerImpl::handleClient, this, client_socket, std::move(client_address), std::move(client_length)).detach();
+      } catch(std::runtime_error& e) {
+        std::cout << e.what() << std::endl;
       }
     }
   }
@@ -104,12 +118,17 @@ struct Server::ServerImpl {
             std::cout << "Unknown request '" << msg.type << "' from " << client_socket << std::endl;
           }
         }
+      } catch(DisconnectedException& e) {
+        std::cout << "Client " << client_socket << " disconnected" << std::endl;
       } catch(std::runtime_error& e) {
         std::cout << e.what() << std::endl;
       }
-      std::cout << "Closing client " << client_socket << std::endl;
       close(client_socket);
-      no_clients--;
+      {
+        std::lock_guard<std::mutex> lock(mutex);
+        no_clients--;
+      }
+      cond_var.notify_all();
   }
 
   void handleSqrtRequest(int client_socket, uint32_t id, double value) {
@@ -136,11 +155,12 @@ struct Server::ServerImpl {
 
   const int domain, port;
   std::size_t max_clients;
-  std::atomic_size_t no_clients;
+  std::size_t no_clients;
   int max_queue, master_socket;
   sockaddr_in address;
   socklen_t address_length;
   std::mutex mutex;
+  std::condition_variable cond_var;
 };
 
 Server::Server(const short port, const size_t max_clients, const int max_queue)

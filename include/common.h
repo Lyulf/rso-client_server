@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <netinet/in.h>
 
+#define UNUSED(expr) (void)(expr)
+
 namespace rso {
 
 struct Message;
