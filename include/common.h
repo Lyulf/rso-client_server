@@ -27,7 +27,8 @@ void throwErrno(const char* msg) {
 
 template <typename T>
 T swap_endian(const T& value) {
-  // check if big endian
+  // if computer has Big-endian order then
+  // there is no need for swap
   if(htons(10) == 10) {
     return value;
   }

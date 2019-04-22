@@ -24,9 +24,7 @@ public:
       std::cout << "Successfully conected" << std::endl;
   }
 
-  ~ClientImpl() {
-
-  }
+  ~ClientImpl() = default;
 
   void initAddress(std::string ipv4) {
       address.sin_family = defaults::domain;
@@ -68,9 +66,7 @@ Client::Client(const std::string& ipv4, const short port)
   : impl(std::make_unique<ClientImpl>(ipv4, port)) {
 }
 
-Client::~Client() {
-
-}
+Client::~Client() = default;
 
 void Client::sendSqrtRequest(double value) {
   impl->sendSqrtRequest(value);

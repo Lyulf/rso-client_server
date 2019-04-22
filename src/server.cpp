@@ -32,9 +32,7 @@ struct Server::ServerImpl {
     std::cout << "Server initialized" << std::endl;
   }
   
-  ~ServerImpl() {
-
-  }
+  ~ServerImpl() = default;
 
   void initAddress() {
     address.sin_family = domain;
