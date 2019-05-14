@@ -1,3 +1,4 @@
 .vscode/*
-obj/*
+.obj/*
+.dep/*
 rso1new.pdf
